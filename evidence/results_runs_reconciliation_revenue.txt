@@ -1,0 +1,28 @@
+== pipeline_runs
+           dag_id  status  rows_extracted  rows_loaded  rows_quarantined
+nammamart_etl_jay SUCCESS            5212         2733               280
+nammamart_elt_jay SUCCESS            5212         5212               280
+nammamart_elt_jay SUCCESS            5212         5212               280
+nammamart_etl_jay SUCCESS            5212         2733               280
+nammamart_elt_jay SUCCESS            5212         5212               280
+
+== ETL reconciliation
+              mismatch_reason   n    amount
+              AMOUNT_MISMATCH  13    685.00
+              MISSING_PAYMENT  27  17193.35
+      ORPHAN_PAYMENT_NO_ORDER   8   4580.57
+ORPHAN_PAYMENT_ORDER_REJECTED 211 160134.63
+               PAYMENT_FAILED  42  25722.25
+
+== ELT reconciliation
+              mismatch_reason   n    amount
+              AMOUNT_MISMATCH  13    685.00
+              MISSING_PAYMENT  27  17193.35
+      ORPHAN_PAYMENT_NO_ORDER   8   4580.57
+ORPHAN_PAYMENT_ORDER_REJECTED 211 160134.63
+               PAYMENT_FAILED  42  25722.25
+
+== revenue check (should be identical)
+src    revenue
+ETL 1060547.95
+ELT 1060547.95

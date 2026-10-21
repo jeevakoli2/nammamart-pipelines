@@ -1,0 +1,21 @@
+.git
+.env
+.DS_Store
+airflow_settings.yaml
+__pycache__/
+astro
+.venv
+.astro/standalone/
+airflow-webserver.pid
+webserver_config.py
+airflow.cfg
+airflow.db
+.astro/*.local.yml
+.astro/*.local.yaml
+test_api.py 
+
+# NammaMart (jay): generated artefacts - the warehouse holds RAW (unmasked) customer data by design, never commit it
+include/warehouse_jay.duckdb
+include/warehouse_jay.duckdb.wal
+include/tmp/
+include/quarantine/jay/

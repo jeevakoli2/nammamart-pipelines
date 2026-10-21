@@ -1,0 +1,15 @@
+==> include/quarantine/jay/orders_failed_scheduled__2026-10-20T03_30_00_00_00.csv <==
+order_id,order_ts,customer_id,store_id,product_id,quantity,unit_price,discount_pct,order_amount,payment_mode,order_status,channel,delivery_minutes,_source_file,failure_reason,failure_description
+ORD002255,2026-09-29 10:33:19,,S08,P0016,1,224.0,0,224.0,UPI,DELIVERED,App,33.0,orders.csv,orders.customer_id_not_null,customer_id is missing
+ORD002225,2026-09-28 21:49:35,C00391,S09,P0117,2,77.0,15,130.9,UPI,DELIVERED,App,21.0,orders.csv,orders.product_fk,product_id not found in valid products
+ORD000894,2026-09-12 20:03:40,C00101,S01,P0060,2,531.0,20,849.6,UPI,DELIVERED,App,12.0,orders.csv,orders.product_fk,product_id not found in valid products
+ORD002103,2026-09-27 09:31:35,C00025,S03,P0093,1,492.0,250,492.0,UPI,DELIVERED,App,23.0,orders.csv,orders.discount_range; orders.amount_formula,discount_pct outside 0-100 | order_amount != quantity x unit_price x (1 - discount/100)
+ORD001113,2026-09-15 09:34:03,C00102,S08,P0051,1,283.0,0,283.0,UPI,DELIVERED,App,18.0,orders.csv,orders.product_fk,product_id not found in valid products
+
+==> include/quarantine/jay/orders_failed_scheduled__2026-10-21T03_30_00_00_00.csv <==
+order_id,order_ts,customer_id,store_id,product_id,quantity,unit_price,discount_pct,order_amount,payment_mode,order_status,channel,delivery_minutes,_source_file,failure_reason,failure_description
+ORD002255,2026-09-29 10:33:19,,S08,P0016,1,224.0,0,224.0,UPI,DELIVERED,App,33.0,orders.csv,orders.customer_id_not_null,customer_id is missing
+ORD002225,2026-09-28 21:49:35,C00391,S09,P0117,2,77.0,15,130.9,UPI,DELIVERED,App,21.0,orders.csv,orders.product_fk,product_id not found in valid products
+ORD000894,2026-09-12 20:03:40,C00101,S01,P0060,2,531.0,20,849.6,UPI,DELIVERED,App,12.0,orders.csv,orders.product_fk,product_id not found in valid products
+ORD002103,2026-09-27 09:31:35,C00025,S03,P0093,1,492.0,250,492.0,UPI,DELIVERED,App,23.0,orders.csv,orders.discount_range; orders.amount_formula,discount_pct outside 0-100 | order_amount != quantity x unit_price x (1 - discount/100)
+ORD001113,2026-09-15 09:34:03,C00102,S08,P0051,1,283.0,0,283.0,UPI,DELIVERED,App,18.0,orders.csv,orders.product_fk,product_id not found in valid products

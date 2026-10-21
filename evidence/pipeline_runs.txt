@@ -1,0 +1,6 @@
+           dag_id                                   run_id                 start_time                   end_time  status
+nammamart_etl_jay     scheduled__2026-10-20T03:30:00+00:00 2026-10-20 19:46:32.090769 2026-10-20 19:46:49.101628 SUCCESS
+nammamart_elt_jay     scheduled__2026-10-20T03:30:00+00:00 2026-10-20 19:50:38.379725 2026-10-20 19:51:02.516257 SUCCESS
+nammamart_elt_jay manual__2026-10-20T19:52:02.096648+00:00 2026-10-20 19:52:02.746105 2026-10-20 19:52:25.128895 SUCCESS
+nammamart_etl_jay     scheduled__2026-10-21T03:30:00+00:00 2026-10-21 03:30:00.805014 2026-10-21 03:30:25.222164 SUCCESS
+nammamart_elt_jay     scheduled__2026-10-21T03:30:00+00:00 2026-10-21 03:30:00.808203 2026-10-21 03:30:29.660136 SUCCESS
