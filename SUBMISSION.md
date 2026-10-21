@@ -77,15 +77,37 @@ Row-level detail lives in `etl_quarantine` / `mart_rejected_rows` (critical) and
 
 ## Part E — Governance
 
-1. **Ownership.** Orders & payments: Ops/Finance data owners (payments → Finance); customers → CRM/Marketing owner; products → Category/Catalogue; stores → Store Ops; warehouse tables → the data team (us, until NammaMart hires one). A change to a rule like the 120-minute limit is approved by the *metric owner* (COO Kavya, as it drives the 10-minute KPI) with Finance consulted; logged in git (catalog in `nammamart_common.py`).
-2. **Data dictionary.** `etl_fact_orders`: order_id (PK, text, from orders.csv), order_ts/order_date, customer_id/product_id/store_id (FKs), quantity (int), unit_price, discount_pct (0–100), order_amount (=q×p×(1−d/100)), payment_mode (UPI/Card/Cash on Delivery/Wallet), order_status (DELIVERED/CANCELLED/RETURNED), channel (App/Web), delivery_minutes (<120), net_revenue (order_amount if DELIVERED else 0), gross_margin (net_revenue − qty×cost_price), within_15_min (bool), source_file, src_rank, _run_id. `etl_dim_customer`: customer_id, **full_name_masked, email_masked, phone_masked (PII-masked)**, city, area, pincode (*quasi-PII*), signup_date, loyalty_tier (Bronze/Silver/Gold/Platinum), is_active (Y/N). `etl_dim_product`: product_id, name, category (6 values), sub_category, brand, mrp, cost_price, unit, is_perishable, launch_date. `etl_dim_store`: store_id, store_name, zone (North/South/East/West/Unknown), area, pincode, open_date, manager_name, capacity_orders_per_day. No raw PII in any ETL/mart table.
-3. **Lineage.** ELT: `mart_daily_store_kpis` row → `stg_orders WHERE store_id, order_date, dq_status<>'FAILED'` → `raw_orders` by `order_id` with `_source_file`, `_run_id`, `_loaded_at`: every step is one SQL join. ETL: fact has `source_file` and `_run_id` but not the original row, and the quarantine CSV/`etl_quarantine` hold only rejected rows, so a passed row must be re-found by `order_id` in the CSV. **ELT is easier**: lineage is data, not code.
-4. **Personal data.** customers: full_name, email, phone (direct); pincode/area (quasi-identifiers); customer_id (pseudonymous key). Masked as `pr***@example.com`, `98******21`, `S*** B***`; masked rather than deleted so analysts can still count/join/dedupe and support can recognise a record without seeing it. Applicable law: **Digital Personal Data Protection Act, 2023** — lawful purpose/consent, data minimisation, purpose and retention limits, security safeguards, breach notification, and erasure on request.
-5. **Access control.** Raw: pipeline service account + a named data steward only; staging: data team; marts: Ops/Finance/leadership; quarantine: data team + Finance reviewers (customers quarantine is masked). Unmasked `raw_customers` phone: nobody routinely — break-glass by the steward with a logged reason.
-6. **Retention.** Raw: the audit window Finance needs (suggest 7 years for financial records, to be confirmed by Finance/legal); quarantine: until reviewed + 90 days; masked customer data: while the customer is active, then anonymise/delete. After expiry: delete (raw PII first) and keep aggregates.
-7. **Secrets.** `SLACK_WEBHOOK_URL` etc. live in Airflow Variables/Connections (or a secrets backend), read with `Variable.get()`; never in DAG files or Git because Git history is permanent and widely copied; nothing in this repo contains a secret.
-8. **Audit (rejected order).** *ELT:* `SELECT * FROM raw_orders WHERE order_id='…'` (exactly as received) → `stg_orders.failure_reason` → absent from every mart because marts filter `dq_status <> 'FAILED'`; `SELECT sum(order_amount) …` proves the total. *ETL:* the quarantine CSV row + `etl_quarantine` give the reason and `NOT EXISTS (… etl_fact_orders)` proves exclusion — **but the quarantine CSV holds standardised values (e.g. `PENDING??`), not the literal bytes received; exact original needs the source file.** ELT is the better audit answer.
-9. **Change history.** Delivered 3 Sep, RETURNED 1 Oct: both pipelines now show it as RETURNED (September revenue drops). Measured: the 9 applied corrections reduced September from ₹1,060,547.95 to ₹1,056,885.25 (−₹3,662.70). Finance usually wants the *as-reported* September number (what was shown to the CFO) *and* the corrected one: keep both. ELT: raw already retains both versions (`_run_id`) → an as-of query; ETL: `etl_order_status_history` records old → new. Next step would be an SCD2 / snapshot table.
+**1. Who owns what.**
+Orders and payments belong to the Ops and Finance teams (payments mostly to Finance). Customers belong to whoever runs the CRM or marketing side. Products belong to the catalogue team and stores belong to Store Ops. The warehouse tables are owned by the data team, which is us for now. If someone wants to change a rule, like the 120-minute delivery limit, the owner of that metric should approve it, and Finance should be asked too. Every rule lives in one list in `nammamart_common.py`, so each change shows up in Git history.
+
+**2. Data dictionary (short version).**
+- `etl_fact_orders`: one row per order. It has order_id, order date and time, customer, product and store IDs, quantity, price, discount, order amount, payment mode, status, channel and delivery minutes. I also added net_revenue (the order amount if the order was delivered, otherwise 0), gross_margin (revenue minus quantity times cost price) and a flag for "delivered within 15 minutes".
+- `etl_dim_customer`: customer_id, masked name, masked email, masked phone, city, area, pincode, signup date, loyalty tier and active flag.
+- `etl_dim_product`: product details like name, category, brand, mrp, cost price and unit.
+- `etl_dim_store`: store details like name, zone, area, manager and daily capacity.
+
+No raw phone numbers or emails are stored in any of these tables.
+
+**3. Lineage (tracing a number back to the source).**
+In the ELT pipeline every row keeps the file name, run id and load time, so I can go from a mart number to the staging row to the raw row with simple joins. In the ETL pipeline the fact table only keeps the source file and run id, not the original row, so tracing takes more work. ELT is easier here.
+
+**4. Personal data.**
+Name, email and phone are personal data. Pincode and area are also sensitive because they can point to a person. I mask them (for example `pr***@example.com` and `98******21`) instead of deleting them, so analysts can still count and join customers without seeing real contact details. The law that applies in India is the Digital Personal Data Protection Act, 2023. It means we should collect only what we need, keep it only as long as needed, protect it, and delete it when asked.
+
+**5. Who can see what.**
+Raw data: only the pipeline account and one named data steward. Staging: the data team. Marts: Ops, Finance and leadership. Quarantine files: the data team and Finance reviewers (the customer quarantine file is masked). Nobody should read raw phone numbers day to day. If it is ever needed, the steward does it and writes down the reason.
+
+**6. How long to keep data.**
+Raw data for as long as Finance needs it for audit (I suggest 7 years, but Finance and legal should confirm). Quarantine files until someone has reviewed them, plus about 90 days. Customer data while the customer is active, then it should be anonymised or deleted. When the time is up, delete the raw personal data first and keep only the totals.
+
+**7. Passwords and keys.**
+Things like a Slack webhook go into Airflow Variables or Connections, not into the code. Git history is permanent and many people can copy it, so a secret pushed once is effectively leaked. There are no secrets in this repo.
+
+**8. Checking a rejected order.**
+In ELT I look up the order in `raw_orders` (exactly as it came in), then in `stg_orders` to see the failure reason, and then I can show that no mart contains it, because every mart ignores rows marked FAILED. In ETL I can see the reason in the quarantine file and in `etl_quarantine`, and I can show the order is missing from the fact table. One weakness: the ETL quarantine file stores cleaned values (for example `PENDING??` in capitals), not the exact original text. ELT is better for audits.
+
+**9. When an order status changes later.**
+An order delivered on 3 September can come back as RETURNED on 1 October. Both pipelines then show RETURNED, and September revenue goes down. In my test the 9 corrections that went through reduced September revenue from 1,060,547.95 to 1,056,885.25. Finance would probably want both versions: the number they already reported and the corrected one. ELT keeps both in the raw table. ETL keeps a small history table (`etl_order_status_history`). A proper fix would be a snapshot table that stores each version with dates.
 
 ## Part F — Observability results
 
@@ -108,20 +130,20 @@ Experiments run on both DAGs (`experiments/run_experiments.py`, scratch copies, 
 
 ## Part G — Recommendation to Sameer (CTO)
 
-**Adopt ELT — with finance reading only the marts, which still give Finance their guarantee.**
+I recommend ELT, with Finance reading only from the mart tables.
 
-*Evidence.* Built side by side on identical data, both pipelines produced the same September number (₹1,060,547.95), the same 280 rejected rows and the same 44 quality results. So the ETL promise — "a bad row never reaches the CFO" — is met by ELT too, because every mart filters `dq_status <> 'FAILED'`, and the rejected rows stay inspectable.
+**Why.** I built both pipelines and ran them on the same data. Both gave the same September revenue (1,060,547.95), the same 280 rejected rows, and the same results for all 44 quality checks. So the main promise of ETL, that a bad row never reaches the CFO, also works in ELT, because every mart leaves out rows marked FAILED. And the rejected rows stay available to look at.
 
-* **Auditability:** ELT wins. Raw rows are kept exactly as received with run and file lineage; the ETL quarantine file holds standardised values, not the original bytes.
-* **Data-quality guarantee:** a tie in outcome; ELT needs discipline (marts must always filter), ETL enforces it physically.
-* **Ease of change:** ELT. A new rule or a changed definition (e.g. the 120-minute limit) is one SQL edit re-run over retained raw data; in ETL, past rejects can't be re-judged without re-reading source files.
-* **Scale ×1000:** ELT. The SQL runs in the warehouse engine; the ETL path holds whole files in pandas memory inside one task. (Both would need a server warehouse, see risk 2.)
-* **Cost:** ETL stores less (no raw copy, ~2× raw growth per run in ELT today); at NammaMart's size storage cost is trivial next to Finance's weekly half-day reconciliation.
+- **Audit:** ELT is better. The raw data stays exactly as it arrived, with file and run details. The ETL quarantine file holds cleaned values.
+- **Data quality:** about equal. ETL blocks bad rows physically. ELT depends on the marts always filtering them out.
+- **Changing rules:** ELT is easier. I edit one SQL file and rebuild from the raw data. In ETL, old rejected rows cannot be re-checked unless I read the source files again.
+- **Growing 1000 times:** ELT is better, because the heavy work runs as SQL inside the warehouse. My ETL loads whole files into memory in one task.
+- **Cost:** ETL stores less, since there is no raw copy. ELT adds about the same amount of raw data every run. At this size the storage cost is small compared to Finance spending half a day every week on reconciliation.
 
-**Top 3 risks of the ELT design**
-1. **Raw PII is stored unmasked** (`raw_customers`) — breach and DPDP-Act exposure. Needs strict access control, encryption, retention limits and masked views for everyone else.
-2. **DuckDB is a single-writer file.** Both DAGs collide at 09:00 (handled with connection retries) and it is not a shared, backed-up warehouse. Move to a server warehouse before real use.
-3. **Quality failures degrade silently.** Volume and freshness only warn; distribution drift passed undetected (Exp 7, 8b), and a master-data fault cascades into revenue (118 orders / ₹76,446.43 held back). Add blocking volume/drift checks and resolve client question 2.
+**Three risks with ELT.**
+1. The raw customer table holds real phone numbers and emails. If that leaks, it is a serious problem under the DPDP Act. It needs tight access, encryption and a retention limit.
+2. DuckDB is a single file that only one process can write to at a time. Both DAGs start at 09:00 and I had to add retries so they don't clash. It is also not a shared, backed-up warehouse. Before real use we should move to a proper database server.
+3. Some problems only produce a warning and don't stop the load. When I cut the orders file to 50 rows, the run still finished successfully. When I multiplied one store's prices and amounts by 100, no check caught it and total revenue grew by about 685%. A broken product row can also quietly remove revenue (118 delivered orders worth 76,446.43 are held back for that reason). We need blocking checks for volume and big changes, and we need the client's answer on that product question.
 
 ---
 
